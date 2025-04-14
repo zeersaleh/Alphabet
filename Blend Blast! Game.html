@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ABC Academy: BlePl, Sl Dr, Tr, Sn, Sp, Sw, STnd Blast!</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        /* Custom styles */
+        body {
+            font-family: 'Nunito', sans-serif; /* Fun, rounded font */
+            background: linear-gradient(135deg, #60a5fa, #a78bfa); /* Gradient background */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden; /* Hide overflow for animations */
+            position: relative; /* Needed for absolute positioning of animations */
+        }
+        .game-container {
+            background-color: rgba(255, 255, 255, 0.9); /* Slightly transparent white */
+            padding: 2rem;
+            border-radius: 1.5rem; /* More rounded corners */
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            text-align: center;
+            width: 90%;
+            max-width: 500px;
+            position: relative; /* For positioning elements inside */
+            overflow: hidden; /* Keep animations contained */
+        }
+        .blend-button {
+            transition: all 0.2s ease-in-out;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .blend-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+        }
+        .blend-button:active {
+            transform: translateY(0px);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .correct-flash {
+            animation: flash-green 0.5s ease-out;
+        }
+        .incorrect-flash {
+            animation: flash-red 0.5s ease-out;
+        }
+        @keyframes flash-green {
+            0%, 100% { background-color: #22c55e; color: white; } /* Green-500 */
+            50% { background-color: #86efac; color: black; } /* Green-300 */
+        }
+        @keyframes flash-red {
+            0%, 100% { background-color: #ef4444; color: white; } /* Red-500 */
+            50% { background-color: #fca5a5; color: black; } /* Red-300 */
+        }
+
+        /* Fun animation for 100% score */
+        .floating-emoji {
+            position: absolute;
+            font-size: 2rem;
+            animation: float 10s linear infinite;
+            opacity: 0.8;
+            z-index: 10; /* Ensure they are above container but below modals if any */
+            pointer-events: none; /* Prevent interaction */
+        }
+
+        @keyframes float {
+            0% { transform: translateY(100vh) rotate(0deg); opacity: 0.8; }
+            50% { transform: translateY(50vh) rotate(180deg); opacity: 0.8; }
+            100% { transform: translateY(-100px) rotate(360deg); opacity: 0; }
+        }
+        /* Timer bar style */
+        #timer-bar-fill {
+            height: 100%;
+            background-color: #34d399; /* Emerald-400 */
+            border-radius: 0.25rem;
+            transition: width 0.1s linear; /* Smooth timer transition */
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container" class="game-container">
+
+        <div id="start-screen">
+            <h1 class="text-4xl font-bold mb-4 text-purple-700">ABC Academy</h1>
+            <h2 class="text-3xl font-bold mb-8 text-blue-600">Blend Blast! 🚀</h2>
+            <p class="mb-6 text-lg text-gray-700">Match the picture to its starting blend sound!</p>
+             <p class="mb-6 text-sm text-gray-500">(Make sure your sound is on!)</p>
+            <button id="start-button" class="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-8 rounded-full text-xl shadow-lg transition duration-200 ease-in-out transform hover:scale-105">
+                Play Now!
+            </button>
+            <div class="mt-8">
+                <a href="https://www.instagram.com/saleh__zeer/" target="_blank" rel="noopener noreferrer" class="text-blue-500 hover:text-blue-700 underline transition duration-200">
+                    Follow ABC Academy on Instagram
+                </a>
+            </div>
+        </div>
+
+        <div id="game-screen" class="hidden">
+            <div class="flex justify-between items-center mb-4">
+                <div id="score" class="text-xl font-bold text-purple-700">Score: 0 / 0</div>
+                <div class="w-1/3">
+                     <div id="timer" class="text-xl font-bold text-blue-600">Time: 15s</div>
+                     <div id="timer-bar" class="w-full bg-gray-300 rounded h-2 mt-1 overflow-hidden">
+                         <div id="timer-bar-fill"></div>
+                     </div>
+                </div>
+            </div>
+            <div id="picture-display" class="text-8xl mb-2">
+                ❓
+            </div>
+            <div id="word-display" class="text-3xl font-semibold text-gray-800 mb-4 h-10">
+                 </div>
+             <div id="feedback-emoji" class="text-5xl mb-4 h-12">
+                </div>
+            <div id="blend-options" class="grid grid-cols-2 gap-4">
+                </div>
+        </div>
+
+        <div id="end-screen" class="hidden">
+            <h2 id="end-title" class="text-3xl font-bold mb-4">Game Over!</h2>
+            <div id="final-score" class="text-2xl mb-6">Your Score: 0 / 0</div>
+            <div id="star-rating" class="text-5xl mb-6"></div>
+            <button id="play-again-button" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-8 rounded-full text-xl shadow-lg transition duration-200 ease-in-out transform hover:scale-105">
+                Play Again?
+            </button>
+             <div class="mt-8">
+                <a href="https://www.instagram.com/saleh__zeer/" target="_blank" rel="noopener noreferrer" class="text-blue-500 hover:text-blue-700 underline transition duration-200">
+                    Follow ABC Academy on Instagram
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div id="animation-container" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5; overflow: hidden;"></div>
+
+
+    <script>
+        // --- Game Data ---
+        const wordData = [
+            { blend: 'Pl', word: 'plate', emoji: '🍽️' },
+            { blend: 'Pl', word: 'play', emoji: '▶️' },
+            { blend: 'Sl', word: 'slide', emoji: '🛝' },
+            { blend: 'Sl', word: 'sleep', emoji: '😴' },
+            { blend: 'Dr', word: 'drum', emoji: '🥁' },
+            { blend: 'Dr', word: 'dress', emoji: '👗' },
+            { blend: 'Tr', word: 'truck', emoji: '🚚' },
+            { blend: 'Tr', word: 'tree', emoji: '🌳' },
+            { blend: 'Sn', word: 'snake', emoji: '🐍' },
+            { blend: 'Sn', word: 'snow', emoji: '❄️' },
+            { blend: 'Sp', word: 'spoon', emoji: '🥄' },
+            { blend: 'Sp', word: 'spot', emoji: '⚫' },
+            { blend: 'Sw', word: 'swim', emoji: '🏊' },
+            { blend: 'Sw', word: 'swing', emoji: '🤸' },
+            { blend: 'St', word: 'stop', emoji: '🛑' },
+            { blend: 'St', word: 'stamp', emoji: '📮' }
+        ];
+
+        const allBlends = [...new Set(wordData.map(item => item.blend))];
+
+        // --- DOM Elements ---
+        const startScreen = document.getElementById('start-screen');
+        const gameScreen = document.getElementById('game-screen');
+        const endScreen = document.getElementById('end-screen');
+        const startButton = document.getElementById('start-button');
+        const playAgainButton = document.getElementById('play-again-button');
+        const scoreDisplay = document.getElementById('score');
+        const timerDisplay = document.getElementById('timer');
+        const timerBarFill = document.getElementById('timer-bar-fill');
+        const pictureDisplay = document.getElementById('picture-display');
+        const wordDisplay = document.getElementById('word-display');
+        const feedbackEmojiDisplay = document.getElementById('feedback-emoji');
+        const blendOptionsContainer = document.getElementById('blend-options');
+        const finalScoreDisplay = document.getElementById('final-score');
+        const endTitle = document.getElementById('end-title');
+        const starRatingDisplay = document.getElementById('star-rating');
+        const animationContainer = document.getElementById('animation-container');
+        const gameContainer = document.getElementById('game-container');
+
+
+        // --- Game State ---
+        let currentQuestionIndex = 0;
+        let score = 0;
+        let shuffledQuestions = [];
+        let timerInterval = null;
+        let timeLeft = 15;
+        const TOTAL_QUESTIONS = 10;
+
+        // --- Sound Effects (Tone.js) ---
+        let synth;
+        let soundsReady = false;
+
+        // --- Speech Synthesis ---
+        const synthVoice = window.speechSynthesis; // Get the speech synthesis interface
+
+        function setupAudio() {
+            // Initialize Tone.js for feedback sounds
+            if (!soundsReady && typeof Tone !== 'undefined' && Tone.start) {
+                Tone.start().then(() => {
+                    console.log("Audio context started for Tone.js");
+                    synth = new Tone.Synth().toDestination();
+                    soundsReady = true;
+                }).catch(e => {
+                    console.error("Tone.start failed:", e);
+                });
+            } else if (!soundsReady) {
+                 console.warn("Tone.js not fully loaded or Tone.start not available.");
+            }
+
+            // Check for Speech Synthesis support
+             if (!('speechSynthesis' in window)) {
+                console.warn("Speech Synthesis not supported in this browser.");
+             }
+        }
+
+
+        function playSound(correct) {
+            if (!soundsReady || !synth) {
+                console.warn("Feedback sounds not ready or synth not initialized.");
+                return;
+            }
+            try {
+                 if (correct) {
+                    synth.triggerAttackRelease("C5", "8n", Tone.now());
+                 } else {
+                    synth.triggerAttackRelease("C3", "8n", Tone.now());
+                 }
+            } catch (error) {
+                console.error("Error playing feedback sound:", error);
+                 if (typeof Tone !== 'undefined') {
+                    try {
+                       synth = new Tone.Synth().toDestination();
+                    } catch (initError) {
+                        console.error("Error re-initializing feedback synth:", initError);
+                    }
+                 }
+            }
+        }
+
+        // --- Function to speak the word ---
+        function speakWord(word) {
+            if (synthVoice && word) {
+                 // Cancel any previous speech first
+                 synthVoice.cancel();
+
+                 const utterance = new SpeechSynthesisUtterance(word);
+                 // Optional: Configure voice, rate, pitch if needed
+                 // utterance.voice = synthVoice.getVoices()[0]; // Example: Set a specific voice
+                 // utterance.rate = 1; // Speed (0.1 to 10)
+                 // utterance.pitch = 1; // Pitch (0 to 2)
+
+                 utterance.onerror = (event) => {
+                     console.error('SpeechSynthesisUtterance.onerror', event);
+                 };
+
+                 synthVoice.speak(utterance);
+            } else {
+                console.warn("Speech Synthesis not available or word is empty.");
+            }
+        }
+
+        // --- Game Logic ---
+
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        function getRandomElements(array, count, exclude) {
+            const available = array.filter(item => item !== exclude);
+            shuffleArray(available);
+            return available.slice(0, count);
+        }
+
+
+        function startGame() {
+            setupAudio(); // Initialize both Tone.js and check Speech Synthesis
+            score = 0;
+            currentQuestionIndex = 0;
+            shuffledQuestions = shuffleArray([...wordData]).slice(0, TOTAL_QUESTIONS);
+            updateScoreDisplay();
+            startScreen.classList.add('hidden');
+            endScreen.classList.add('hidden');
+            gameScreen.classList.remove('hidden');
+            clearFloatingEmojis();
+            loadQuestion();
+        }
+
+        function loadQuestion() {
+            if (currentQuestionIndex >= shuffledQuestions.length) {
+                endGame();
+                return;
+            }
+
+            // Reset feedback and buttons
+            feedbackEmojiDisplay.textContent = '';
+            blendOptionsContainer.innerHTML = '';
+            const currentQuestion = shuffledQuestions[currentQuestionIndex];
+            pictureDisplay.textContent = currentQuestion.emoji;
+            wordDisplay.textContent = currentQuestion.word;
+
+            // --- Speak the word ---
+            speakWord(currentQuestion.word); // Call the speech function
+
+            // Prepare blend options
+            const correctAnswer = currentQuestion.blend;
+            const wrongAnswers = getRandomElements(allBlends, 3, correctAnswer);
+            const options = shuffleArray([correctAnswer, ...wrongAnswers]);
+
+            // Create buttons for options
+            options.forEach(blend => {
+                const button = document.createElement('button');
+                button.textContent = blend;
+                button.classList.add('blend-button', 'bg-blue-500', 'hover:bg-blue-600', 'text-white', 'font-bold', 'py-4', 'px-4', 'rounded-lg', 'text-2xl', 'w-full');
+                button.onclick = (event) => handleAnswer(blend, button);
+                blendOptionsContainer.appendChild(button);
+            });
+
+            updateScoreDisplay();
+            startTimer();
+        }
+
+        function startTimer() {
+            clearInterval(timerInterval);
+            timeLeft = 15;
+            timerDisplay.textContent = `Time: ${timeLeft}s`;
+            timerBarFill.style.width = '100%';
+            timerBarFill.style.backgroundColor = '#34d399';
+
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                timerDisplay.textContent = `Time: ${timeLeft}s`;
+                const percentageLeft = (timeLeft / 15) * 100;
+                timerBarFill.style.width = `${percentageLeft}%`;
+
+                if (timeLeft <= 5 && timeLeft > 3) {
+                    timerBarFill.style.backgroundColor = '#facc15';
+                } else if (timeLeft <= 3) {
+                    timerBarFill.style.backgroundColor = '#f87171';
+                }
+
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                     // Stop any ongoing speech if timer runs out
+                     if (synthVoice) synthVoice.cancel();
+                    handleAnswer(null, null);
+                }
+            }, 1000);
+        }
+
+        function handleAnswer(selectedBlend, buttonElement) {
+            clearInterval(timerInterval);
+             // Stop any ongoing speech when an answer is selected
+             if (synthVoice) synthVoice.cancel();
+
+            const correctAnswer = shuffledQuestions[currentQuestionIndex].blend;
+            const buttons = blendOptionsContainer.querySelectorAll('button');
+
+            buttons.forEach(btn => btn.disabled = true);
+
+            if (selectedBlend === correctAnswer) {
+                score++;
+                playSound(true); // Play correct feedback sound
+                feedbackEmojiDisplay.textContent = '👍';
+                if (buttonElement) {
+                    buttonElement.classList.remove('bg-blue-500', 'hover:bg-blue-600');
+                    buttonElement.classList.add('correct-flash');
+                }
+            } else {
+                playSound(false); // Play incorrect feedback sound
+                feedbackEmojiDisplay.textContent = '🤔';
+                if (buttonElement) {
+                     buttonElement.classList.remove('bg-blue-500', 'hover:bg-blue-600');
+                     buttonElement.classList.add('incorrect-flash');
+                }
+                buttons.forEach(btn => {
+                    if (btn.textContent === correctAnswer) {
+                        btn.classList.remove('bg-blue-500', 'hover:bg-blue-600');
+                        btn.classList.add('bg-yellow-400');
+                    }
+                });
+            }
+
+            updateScoreDisplay();
+
+            setTimeout(() => {
+                 buttons.forEach(btn => {
+                    btn.disabled = false;
+                    btn.classList.remove('correct-flash', 'incorrect-flash', 'bg-yellow-400');
+                    btn.classList.add('bg-blue-500', 'hover:bg-blue-600');
+                 });
+                currentQuestionIndex++;
+                loadQuestion();
+            }, 1500);
+        }
+
+
+        function updateScoreDisplay() {
+            const total = shuffledQuestions.length > 0 ? shuffledQuestions.length : TOTAL_QUESTIONS;
+            scoreDisplay.textContent = `Score: ${score} / ${total}`;
+        }
+
+        function endGame() {
+             // Stop any ongoing speech when game ends
+             if (synthVoice) synthVoice.cancel();
+
+            gameScreen.classList.add('hidden');
+            endScreen.classList.remove('hidden');
+            const total = shuffledQuestions.length > 0 ? shuffledQuestions.length : TOTAL_QUESTIONS;
+            finalScoreDisplay.textContent = `Your Score: ${score} / ${total}`;
+
+            const percentage = total > 0 ? (score / total) * 100 : 0;
+            let stars = '';
+            if (percentage === 100) {
+                stars = '⭐⭐⭐';
+                endTitle.textContent = 'Perfect!';
+                triggerCelebration();
+                 // Play celebratory sound (Tone.js)
+                 if (soundsReady && synth) {
+                    const now = Tone.now();
+                    synth.triggerAttackRelease("C5", "8n", now);
+                    synth.triggerAttackRelease("E5", "8n", now + 0.2);
+                    synth.triggerAttackRelease("G5", "8n", now + 0.4);
+                 }
+            } else if (percentage >= 70) {
+                stars = '⭐⭐';
+                endTitle.textContent = 'Great Job!';
+            } else if (percentage >= 40) {
+                stars = '⭐';
+                endTitle.textContent = 'Good Try!';
+            } else {
+                stars = ' ';
+                endTitle.textContent = 'Keep Practicing!';
+            }
+            starRatingDisplay.textContent = stars;
+        }
+
+        function triggerCelebration() {
+            clearFloatingEmojis();
+            const emojis = ['🎈', '🧱', '🎉', '✨'];
+            for (let i = 0; i < 20; i++) {
+                const emojiSpan = document.createElement('span');
+                emojiSpan.classList.add('floating-emoji');
+                emojiSpan.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+                emojiSpan.style.left = `${Math.random() * 100}%`;
+                const duration = Math.random() * 5 + 5;
+                const delay = Math.random() * 3;
+                emojiSpan.style.animationDuration = `${duration}s`;
+                emojiSpan.style.animationDelay = `${delay}s`;
+                animationContainer.appendChild(emojiSpan);
+
+                 emojiSpan.addEventListener('animationend', () => {
+                     emojiSpan.remove();
+                 });
+            }
+        }
+
+        function clearFloatingEmojis() {
+            animationContainer.innerHTML = '';
+        }
+
+
+        // --- Event Listeners ---
+        startButton.addEventListener('click', startGame);
+        playAgainButton.addEventListener('click', startGame);
+
+        // Initial setup: Show start screen
+        startScreen.classList.remove('hidden');
+        gameScreen.classList.add('hidden');
+        endScreen.classList.add('hidden');
+
+        // Initialize score display correctly on load
+        updateScoreDisplay();
+
+    </script>
+</body>
+</html>
