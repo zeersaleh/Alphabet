@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ABC Academy Blocks Breaker (Harder)</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #1a1a2e; /* Dark space blue */
+            margin: 0;
+            font-family: 'Press Start 2P', cursive;
+            color: #e0e0e0; /* Light grey text */
+            overflow: hidden; /* Prevent scrollbars */
+        }
+
+        .game-container {
+            text-align: center;
+            border: 5px solid #4a4e69; /* Darker purple-grey border */
+            border-radius: 15px;
+            padding: 20px;
+            background-color: #162447; /* Deep blue background */
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.5); /* Cyan glow */
+        }
+
+        h1 {
+            color: #fca311; /* Orange title */
+            margin-bottom: 5px; /* Reduced margin */
+            font-size: 1.5em; /* Responsive font size */
+        }
+
+        /* Style for the Instagram link */
+        .instagram-link {
+            margin-bottom: 10px;
+            font-size: 0.7em; /* Smaller font size for the link */
+        }
+
+        .instagram-link a {
+            color: #00ffcc; /* Bright teal link */
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+
+        .instagram-link a:hover {
+            color: #ffffff; /* White on hover */
+        }
+
+
+        #scoreBoard {
+            font-size: 1.2em;
+            margin-bottom: 15px;
+            color: #00ffcc; /* Bright teal score */
+        }
+
+        canvas {
+            background-color: #000; /* Black canvas background */
+            display: block;
+            border-radius: 10px;
+            border: 3px solid #4a4e69;
+            /* Make canvas responsive */
+            max-width: 100%;
+            height: auto;
+            aspect-ratio: 480 / 320; /* Maintain aspect ratio */
+            cursor: none; /* Hide cursor over canvas */
+        }
+
+        #messageBox {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(40, 40, 60, 0.9); /* Semi-transparent dark background */
+            color: #fff;
+            padding: 30px;
+            border-radius: 15px;
+            border: 3px solid #fca311; /* Orange border */
+            text-align: center;
+            display: none; /* Hidden by default */
+            z-index: 10;
+            font-size: 1.2em;
+            box-shadow: 0 0 15px rgba(255, 163, 17, 0.7); /* Orange glow */
+        }
+
+        #messageBox button {
+            font-family: 'Press Start 2P', cursive;
+            padding: 10px 20px;
+            font-size: 1em;
+            margin-top: 20px;
+            cursor: pointer;
+            background: linear-gradient(145deg, #fca311, #e85d04); /* Orange gradient */
+            color: #162447; /* Dark blue text */
+            border: none;
+            border-radius: 8px;
+            box-shadow: 0 4px #d35400; /* Darker orange shadow */
+            transition: all 0.1s ease;
+        }
+
+        #messageBox button:active {
+            transform: translateY(2px);
+            box-shadow: 0 2px #d35400;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1>ABC Academy</h1>
+        <p class="instagram-link">
+            <a href="https://www.instagram.com/saleh__zeer/" target="_blank" rel="noopener noreferrer">@saleh__zeer</a>
+        </p>
+        <div id="scoreBoard">Score: 0</div>
+        <canvas id="gameCanvas" width="480" height="320"></canvas>
+        <div id="messageBox">
+            <p id="messageText"></p>
+            <button id="restartButton">Play Again</button>
+        </div>
+    </div>
+
+    <script>
+        // Ensure DOM is fully loaded before starting the game
+        window.onload = function() {
+            const canvas = document.getElementById('gameCanvas');
+            const ctx = canvas.getContext('2d');
+            const scoreBoard = document.getElementById('scoreBoard');
+            const messageBox = document.getElementById('messageBox');
+            const messageText = document.getElementById('messageText');
+            const restartButton = document.getElementById('restartButton');
+
+            // --- Sound Synthesis Setup (Tone.js) ---
+            let synth;
+            let soundEnabled = false; // Sound starts disabled until user interaction
+
+            function initAudio() {
+                if (!soundEnabled && Tone.context.state !== 'running') {
+                    Tone.start().then(() => {
+                        console.log("Audio Context started");
+                        synth = new Tone.Synth({
+                            oscillator: { type: 'square' },
+                            envelope: { attack: 0.005, decay: 0.1, sustain: 0.3, release: 0.1 }
+                        }).toDestination();
+                        soundEnabled = true;
+                    }).catch(e => console.error("Could not start Audio Context:", e));
+                } else if (!synth && soundEnabled) {
+                     synth = new Tone.Synth({
+                            oscillator: { type: 'square' },
+                            envelope: { attack: 0.005, decay: 0.1, sustain: 0.3, release: 0.1 }
+                        }).toDestination();
+                }
+            }
+
+            function playSound(note, duration = '16n', volume = 0) { // Volume in dB
+                if (!soundEnabled) initAudio();
+                if (synth && soundEnabled) {
+                    try { synth.volume.value = volume; synth.triggerAttackRelease(note, duration); }
+                    catch (e) { console.warn("Sound playback failed:", e); }
+                }
+            }
+
+            // --- Game Variables ---
+            let ballRadius = 8;
+            let x, y;
+            let dx, dy;
+            const initialPaddleWidth = 75; // Store initial width
+            const minPaddleWidth = 40; // Minimum paddle width
+            let paddleHeight = 10;
+            let paddleWidth = initialPaddleWidth; // Current paddle width
+            let paddleX;
+            let rightPressed = false;
+            let leftPressed = false;
+            let score = 0;
+            let gameRunning = true;
+            const maxBallSpeed = 6; // Maximum speed for dx and dy components
+            const speedIncrement = 0.1; // How much speed increases per brick
+            const paddleShrinkAmount = 1; // How much paddle shrinks per brick
+
+            // --- Brick Variables ---
+            const brickRowCount = 3;
+            const brickColumnCount = 4;
+            const brickWidth = 75;
+            const brickHeight = 20;
+            const brickPadding = 10;
+            const brickOffsetTop = 30;
+            const brickOffsetLeft = 30;
+            const words = ["This", "That", "Mother", "Father", "Three", "teeth", "Bath", "think", "Duck", "Rocket", "Queen", "Quilt", "noise"];
+            let bricks = [];
+            let wordIndex = 0;
+            let totalBricks = 0; // Count total breakable hits
+
+            // --- Brick Colors ---
+            const brickColor1Hit = "#ff8c00"; // Dark Orange (original)
+            const brickColor2HitInitial = "#a0522d"; // Sienna (darker brown/orange)
+            const brickColor2HitDamaged = "#cd853f"; // Peru (lighter brown/orange)
+
+
+            // Initialize game elements
+            function initGame() {
+                x = canvas.width / 2;
+                y = canvas.height - 30;
+                // Increased initial speed
+                dx = 3;
+                dy = -3;
+                paddleWidth = initialPaddleWidth; // Reset paddle width
+                paddleX = (canvas.width - paddleWidth) / 2;
+                score = 0;
+                wordIndex = 0;
+                bricks = [];
+                totalBricks = 0; // Reset total hits count
+                gameRunning = true;
+                messageBox.style.display = 'none';
+
+                // Create bricks with varying hit requirements
+                for (let c = 0; c < brickColumnCount; c++) {
+                    bricks[c] = [];
+                    for (let r = 0; r < brickRowCount; r++) {
+                        const brickX = c * (brickWidth + brickPadding) + brickOffsetLeft;
+                        const brickY = r * (brickHeight + brickPadding) + brickOffsetTop;
+                        const word = words[wordIndex % words.length];
+                        // Make roughly half the bricks require 2 hits
+                        const hitsRequired = (c + r) % 2 === 0 ? 2 : 1; // Example logic for distribution
+                        bricks[c][r] = {
+                            x: brickX,
+                            y: brickY,
+                            status: 1, // 1: active, 0: broken
+                            word: word,
+                            hitsRequired: hitsRequired,
+                            currentHits: 0
+                        };
+                        totalBricks += hitsRequired; // Add required hits to total
+                        wordIndex++;
+                    }
+                }
+                updateScore();
+            }
+
+            // Event Listeners
+            document.addEventListener("mousemove", mouseMoveHandler, false);
+            document.addEventListener("keydown", keyDownHandler, false);
+            document.addEventListener("keyup", keyUpHandler, false);
+            document.addEventListener('click', initAudio, { once: true });
+            document.addEventListener('keydown', initAudio, { once: true });
+            restartButton.addEventListener("click", () => {
+                initGame();
+                draw();
+            });
+
+            // --- Control Handlers ---
+            function mouseMoveHandler(e) {
+                if (!soundEnabled) initAudio();
+                const rect = canvas.getBoundingClientRect();
+                let relativeX = e.clientX - rect.left;
+                relativeX *= canvas.width / rect.width;
+
+                // Adjust paddle position considering its current width
+                if (relativeX > 0 + paddleWidth / 2 && relativeX < canvas.width - paddleWidth / 2) {
+                    paddleX = relativeX - paddleWidth / 2;
+                } else if (relativeX <= paddleWidth / 2) {
+                    paddleX = 0;
+                } else {
+                    paddleX = canvas.width - paddleWidth;
+                }
+            }
+
+            function keyDownHandler(e) {
+                if (e.key == "Right" || e.key == "ArrowRight") rightPressed = true;
+                else if (e.key == "Left" || e.key == "ArrowLeft") leftPressed = true;
+            }
+
+            function keyUpHandler(e) {
+                if (e.key == "Right" || e.key == "ArrowRight") rightPressed = false;
+                else if (e.key == "Left" || e.key == "ArrowLeft") leftPressed = false;
+            }
+
+            // --- Drawing Functions ---
+            function drawBall() {
+                ctx.beginPath();
+                ctx.arc(x, y, ballRadius, 0, Math.PI * 2);
+                const gradient = ctx.createRadialGradient(x, y, ballRadius * 0.1, x, y, ballRadius);
+                gradient.addColorStop(0, "#ffffff");
+                gradient.addColorStop(0.7, "#00ffcc");
+                gradient.addColorStop(1, "#00bfa5");
+                ctx.fillStyle = gradient;
+                ctx.fill();
+                ctx.closePath();
+            }
+
+            function drawPaddle() {
+                ctx.beginPath();
+                // Use current paddleWidth
+                ctx.rect(paddleX, canvas.height - paddleHeight, paddleWidth, paddleHeight);
+                const gradient = ctx.createLinearGradient(paddleX, canvas.height - paddleHeight, paddleX, canvas.height);
+                gradient.addColorStop(0, "#fca311");
+                gradient.addColorStop(1, "#e85d04");
+                ctx.fillStyle = gradient;
+                ctx.fill();
+                ctx.closePath();
+            }
+
+            function drawBricks() {
+                for (let c = 0; c < brickColumnCount; c++) {
+                    for (let r = 0; r < brickRowCount; r++) {
+                        const brick = bricks[c][r];
+                        if (brick.status == 1) {
+                            ctx.beginPath();
+                            ctx.rect(brick.x, brick.y, brickWidth, brickHeight);
+
+                            // Determine brick color based on hits
+                            let fillColor;
+                            if (brick.hitsRequired === 1) {
+                                fillColor = brickColor1Hit;
+                            } else { // 2 hits required
+                                if (brick.currentHits === 0) {
+                                    fillColor = brickColor2HitInitial;
+                                } else { // currentHits === 1
+                                    fillColor = brickColor2HitDamaged;
+                                }
+                            }
+                            ctx.fillStyle = fillColor;
+                            ctx.fill();
+                            ctx.closePath();
+
+                            // Draw word
+                            ctx.font = "10px 'Press Start 2P'";
+                            ctx.fillStyle = "#ffffff";
+                            ctx.textAlign = "center";
+                            const textX = brick.x + brickWidth / 2;
+                            const textY = brick.y + brickHeight / 2 + 4;
+                            ctx.fillText(brick.word, textX, textY);
+                        }
+                    }
+                }
+            }
+
+            function updateScore() {
+                scoreBoard.textContent = `Score: ${score}`;
+            }
+
+            // --- Collision Detection ---
+            function collisionDetection() {
+                for (let c = 0; c < brickColumnCount; c++) {
+                    for (let r = 0; r < brickRowCount; r++) {
+                        const b = bricks[c][r];
+                        if (b.status == 1) {
+                            if (x + ballRadius > b.x && x - ballRadius < b.x + brickWidth &&
+                                y + ballRadius > b.y && y - ballRadius < b.y + brickHeight)
+                            {
+                                dy = -dy; // Reverse ball's vertical direction on any hit
+                                b.currentHits++;
+
+                                if (b.currentHits >= b.hitsRequired) {
+                                    // --- Brick Broken ---
+                                    b.status = 0; // Mark brick as broken
+                                    score++;
+                                    playSound('C5', '16n', -5); // Play break sound (slightly louder)
+
+                                    // Increase speed (with cap)
+                                    if (Math.abs(dx) < maxBallSpeed && Math.abs(dy) < maxBallSpeed) {
+                                        dx += (dx > 0 ? speedIncrement : -speedIncrement);
+                                        dy += (dy > 0 ? speedIncrement : -speedIncrement);
+                                    }
+
+                                    // Decrease paddle width (with minimum)
+                                    if (paddleWidth > minPaddleWidth) {
+                                        paddleWidth -= paddleShrinkAmount;
+                                        // Adjust paddleX to keep it centered somewhat after shrinking
+                                        // paddleX += paddleShrinkAmount / 2; // Optional: re-center
+                                        // Ensure paddle doesn't go off-screen after resize
+                                        if (paddleX + paddleWidth > canvas.width) {
+                                            paddleX = canvas.width - paddleWidth;
+                                        }
+                                    }
+
+                                    updateScore();
+
+                                    // Check for win condition (compare score with total required hits)
+                                    if (score == totalBricks) {
+                                        playSound('G5', '8n', 0); // Play win sound
+                                        showEndGameMessage("YOU WIN, CONGRATS!");
+                                    }
+                                } else {
+                                    // --- Brick Damaged (but not broken) ---
+                                     playSound('A4', '32n', -15); // Play softer hit sound
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // --- Game Logic ---
+            function movePaddle() {
+                 // Use current paddleWidth for boundary checks
+                 if (rightPressed && paddleX < canvas.width - paddleWidth) {
+                    paddleX += 7;
+                } else if (leftPressed && paddleX > 0) {
+                    paddleX -= 7;
+                }
+            }
+
+            function moveBall() {
+                // Bounce off left/right walls
+                if (x + dx > canvas.width - ballRadius || x + dx < ballRadius) {
+                    dx = -dx;
+                    playSound('C4', '32n', -10); // Play wall hit sound
+                }
+                // Bounce off top wall
+                if (y + dy < ballRadius) {
+                    dy = -dy;
+                    playSound('C4', '32n', -10); // Play wall hit sound
+                }
+                // Check for paddle collision or hitting bottom
+                else if (y + dy > canvas.height - ballRadius - paddleHeight) {
+                     // Use current paddleWidth for collision check
+                     if (x > paddleX && x < paddleX + paddleWidth && y + dy > canvas.height - ballRadius - paddleHeight) {
+                         dy = -dy;
+                         playSound('E4', '16n', -8); // Play paddle hit sound
+                         // Adjust angle based on hit location more significantly
+                         let deltaX = x - (paddleX + paddleWidth/2);
+                         dx = deltaX * 0.2; // Increased angle influence
+                         // Clamp dx to prevent extreme horizontal speeds after paddle hit
+                         dx = Math.max(-maxBallSpeed * 0.8, Math.min(maxBallSpeed * 0.8, dx));
+                    } else if (y + dy > canvas.height - ballRadius) {
+                         playSound('C3', '4n', 0); // Play game over sound
+                         showEndGameMessage("GAME OVER");
+                    }
+                }
+
+                x += dx;
+                y += dy;
+            }
+
+            function showEndGameMessage(message) {
+                gameRunning = false;
+                messageText.textContent = message;
+                messageBox.style.display = 'block';
+            }
+
+            // --- Main Game Loop ---
+            function draw() {
+                if (!gameRunning) return;
+
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                drawBricks();
+                drawBall();
+                drawPaddle();
+                collisionDetection();
+                moveBall();
+                movePaddle();
+
+                requestAnimationFrame(draw);
+            }
+
+            // --- Initial Setup ---
+            initGame();
+            draw();
+        };
+    </script>
+</body>
+</html>
