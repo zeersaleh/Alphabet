@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"> <title>ABC Academy Blocks Breaker (Mobile Friendly)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>ABC Academy Blocks Breaker (with Speech)</title>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <style>
@@ -16,7 +17,6 @@
             font-family: 'Press Start 2P', cursive;
             color: #e0e0e0; /* Light grey text */
             overflow: hidden; /* Prevent scrollbars */
-            /* Prevent pull-to-refresh and other touch gestures interfering */
             overscroll-behavior-y: contain;
         }
 
@@ -24,22 +24,22 @@
             text-align: center;
             border: 5px solid #4a4e69; /* Darker purple-grey border */
             border-radius: 15px;
-            padding: 15px; /* Slightly reduced padding */
+            padding: 15px;
             background-color: #162447; /* Deep blue background */
             box-shadow: 0 0 20px rgba(0, 255, 255, 0.5); /* Cyan glow */
-            max-width: 95%; /* Ensure container doesn't overflow small screens */
+            max-width: 95%;
             box-sizing: border-box;
         }
 
         h1 {
             color: #fca311; /* Orange title */
             margin-bottom: 5px;
-            font-size: 1.3em; /* Adjusted font size */
+            font-size: 1.3em;
         }
 
         .instagram-link {
             margin-bottom: 10px;
-            font-size: 0.6em; /* Adjusted font size */
+            font-size: 0.6em;
         }
 
         .instagram-link a {
@@ -52,10 +52,9 @@
             color: #ffffff; /* White on hover */
         }
 
-
         #scoreBoard {
-            font-size: 1em; /* Adjusted font size */
-            margin-bottom: 10px; /* Adjusted margin */
+            font-size: 1em;
+            margin-bottom: 10px;
             color: #00ffcc; /* Bright teal score */
         }
 
@@ -64,11 +63,10 @@
             display: block;
             border-radius: 10px;
             border: 3px solid #4a4e69;
-            /* Make canvas responsive */
             max-width: 100%;
             height: auto;
-            aspect-ratio: 480 / 320; /* Maintain aspect ratio */
-            cursor: none; /* Hide cursor over canvas */
+            aspect-ratio: 480 / 320;
+            cursor: none;
             touch-action: none; /* Prevent default touch actions like scrolling */
         }
 
@@ -79,23 +77,23 @@
             transform: translate(-50%, -50%);
             background-color: rgba(40, 40, 60, 0.9);
             color: #fff;
-            padding: 20px; /* Adjusted padding */
+            padding: 20px;
             border-radius: 15px;
             border: 3px solid #fca311;
             text-align: center;
             display: none;
             z-index: 10;
-            font-size: 1em; /* Adjusted font size */
+            font-size: 1em;
             box-shadow: 0 0 15px rgba(255, 163, 17, 0.7);
-            width: 80%; /* Make message box responsive */
+            width: 80%;
             max-width: 300px;
         }
 
         #messageBox button {
             font-family: 'Press Start 2P', cursive;
-            padding: 10px 15px; /* Adjusted padding */
-            font-size: 0.9em; /* Adjusted font size */
-            margin-top: 15px; /* Adjusted margin */
+            padding: 10px 15px;
+            font-size: 0.9em;
+            margin-top: 15px;
             cursor: pointer;
             background: linear-gradient(145deg, #fca311, #e85d04);
             color: #162447;
@@ -139,8 +137,12 @@
             let synth;
             let soundEnabled = false;
 
-            function initAudio() {
-                // Only initialize if not already enabled and context is not running
+            // --- Speech Synthesis Setup ---
+            let speechEnabled = ('speechSynthesis' in window); // Check if API is available
+            let speechAvailable = false; // Flag to check if voices are loaded
+
+            function initAudioAndSpeech() {
+                // Initialize Tone.js Audio
                 if (!soundEnabled && Tone.context.state !== 'running') {
                     Tone.start().then(() => {
                         console.log("Audio Context started");
@@ -150,21 +152,73 @@
                         }).toDestination();
                         soundEnabled = true;
                     }).catch(e => console.error("Could not start Audio Context:", e));
-                } else if (!synth && soundEnabled) { // If context started but synth creation failed/was delayed
+                } else if (!synth && soundEnabled) {
                      synth = new Tone.Synth({
                             oscillator: { type: 'square' },
                             envelope: { attack: 0.005, decay: 0.1, sustain: 0.3, release: 0.1 }
                         }).toDestination();
                 }
+
+                // Initialize Speech Synthesis (often requires interaction)
+                if (speechEnabled && !speechAvailable) {
+                    // Try to get voices. This might be asynchronous.
+                    const voices = window.speechSynthesis.getVoices();
+                    if (voices.length > 0) {
+                        speechAvailable = true;
+                        console.log("Speech synthesis voices available.");
+                    } else {
+                        // Voices might load later, listen for the event
+                        window.speechSynthesis.onvoiceschanged = () => {
+                            if (window.speechSynthesis.getVoices().length > 0) {
+                                speechAvailable = true;
+                                console.log("Speech synthesis voices loaded.");
+                                window.speechSynthesis.onvoiceschanged = null; // Remove listener once loaded
+                            }
+                        };
+                         // Sometimes a dummy speak call helps trigger voice loading on some browsers
+                         // const dummyUtterance = new SpeechSynthesisUtterance('');
+                         // window.speechSynthesis.speak(dummyUtterance);
+                         // window.speechSynthesis.cancel(); // Cancel immediately
+                         console.log("Waiting for speech synthesis voices to load...");
+                    }
+                }
             }
 
             function playSound(note, duration = '16n', volume = 0) {
-                if (!soundEnabled) initAudio(); // Try to init audio if needed
+                if (!soundEnabled) initAudioAndSpeech(); // Try to init audio if needed
                 if (synth && soundEnabled) {
                     try { synth.volume.value = volume; synth.triggerAttackRelease(note, duration); }
                     catch (e) { console.warn("Sound playback failed:", e); }
                 }
             }
+
+            // --- Speak Word Function ---
+            function speakWord(text) {
+                if (!speechEnabled) {
+                    console.warn("Speech synthesis not supported by this browser.");
+                    return;
+                }
+                 if (!speechAvailable) {
+                    console.warn("Speech synthesis voices not ready yet.");
+                    // Optionally try to init again, or just wait
+                    initAudioAndSpeech();
+                    return;
+                 }
+                 // Cancel any ongoing speech before starting new one
+                 window.speechSynthesis.cancel();
+
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'en-US'; // Set language if desired
+                utterance.rate = 0.9; // Adjust speech rate (0.1 to 10)
+                utterance.pitch = 1.1; // Adjust pitch (0 to 2)
+
+                // Optional: Select a specific voice if needed
+                // const voices = window.speechSynthesis.getVoices();
+                // utterance.voice = voices.find(voice => voice.lang === 'en-US');
+
+                window.speechSynthesis.speak(utterance);
+            }
+
 
             // --- Game Variables ---
             let ballRadius = 8;
@@ -185,12 +239,9 @@
 
             // --- Brick Variables ---
             const brickRowCount = 3;
-            const brickColumnCount = 5; // Increased columns for better fit
-            let brickWidth; // Calculated dynamically
-            let brickHeight = 20;
-            let brickPadding; // Calculated dynamically
-            let brickOffsetTop = 30;
-            let brickOffsetLeft; // Calculated dynamically
+            const brickColumnCount = 5;
+            let brickWidth, brickHeight = 20, brickPadding, brickOffsetLeft;
+            const brickOffsetTop = 30;
             const words = ["This", "That", "Mother", "Father", "Three", "teeth", "Bath", "think", "Duck", "Rocket", "Queen", "Quilt", "noise"];
             let bricks = [];
             let wordIndex = 0;
@@ -201,49 +252,34 @@
             const brickColor2HitInitial = "#a0522d";
             const brickColor2HitDamaged = "#cd853f";
 
-            // Function to calculate brick layout based on canvas size
             function calculateBrickLayout() {
-                const totalPaddingSpace = canvas.width * 0.15; // Use 15% of width for padding/offsets
+                const totalPaddingSpace = canvas.width * 0.15;
                 brickOffsetLeft = totalPaddingSpace / 2;
                 const availableWidth = canvas.width - totalPaddingSpace;
-                brickPadding = availableWidth / (brickColumnCount * 4); // Adjust padding calculation
+                brickPadding = availableWidth / (brickColumnCount * 4);
                 brickWidth = (availableWidth - (brickPadding * (brickColumnCount -1))) / brickColumnCount;
-
-                 // Optional: Adjust brick height based on width for better aspect ratio
-                 // brickHeight = brickWidth / 3.5;
             }
 
-
-            // Initialize game elements
             function initGame() {
-                calculateBrickLayout(); // Calculate layout first
-
+                calculateBrickLayout();
                 x = canvas.width / 2;
                 y = canvas.height - 30;
-                dx = 3;
-                dy = -3;
+                dx = 3; dy = -3;
                 paddleWidth = initialPaddleWidth;
                 paddleX = (canvas.width - paddleWidth) / 2;
-                score = 0;
-                wordIndex = 0;
-                bricks = [];
-                totalBricks = 0;
+                score = 0; wordIndex = 0; bricks = []; totalBricks = 0;
                 gameRunning = true;
                 messageBox.style.display = 'none';
+                window.speechSynthesis.cancel(); // Stop any speech from previous game
 
-                // Create bricks with calculated layout and varying hits
                 for (let c = 0; c < brickColumnCount; c++) {
                     bricks[c] = [];
                     for (let r = 0; r < brickRowCount; r++) {
-                        // Use calculated dimensions and offsets
                         const brickX = c * (brickWidth + brickPadding) + brickOffsetLeft;
                         const brickY = r * (brickHeight + brickPadding) + brickOffsetTop;
                         const word = words[wordIndex % words.length];
                         const hitsRequired = (c + r) % 2 === 0 ? 2 : 1;
-                        bricks[c][r] = {
-                            x: brickX, y: brickY, status: 1, word: word,
-                            hitsRequired: hitsRequired, currentHits: 0
-                        };
+                        bricks[c][r] = { x: brickX, y: brickY, status: 1, word: word, hitsRequired: hitsRequired, currentHits: 0 };
                         totalBricks += hitsRequired;
                         wordIndex++;
                     }
@@ -252,67 +288,45 @@
             }
 
             // --- Event Listeners ---
-            // Mouse controls
             document.addEventListener("mousemove", handlePointerMove, false);
-            // Touch controls
             document.addEventListener("touchstart", handlePointerStart, false);
             document.addEventListener("touchmove", handlePointerMove, false);
-             // Keyboard controls
             document.addEventListener("keydown", keyDownHandler, false);
             document.addEventListener("keyup", keyUpHandler, false);
-            // Audio initialization triggers
-            document.addEventListener('click', initAudio, { once: true });
-            document.addEventListener('keydown', initAudio, { once: true });
-            document.addEventListener('touchstart', initAudio, { once: true }); // Init audio on touch
-            // Restart button
+            // Unified init for audio and speech
+            document.addEventListener('click', initAudioAndSpeech, { once: true });
+            document.addEventListener('keydown', initAudioAndSpeech, { once: true });
+            document.addEventListener('touchstart', initAudioAndSpeech, { once: true });
             restartButton.addEventListener("click", () => {
                 initGame();
                 draw();
             });
 
-            // --- Unified Pointer Handler (Mouse & Touch) ---
+            // --- Unified Pointer Handler ---
             function handlePointerStart(e) {
-                 // Prevent default touch actions like scrolling/zooming
                 e.preventDefault();
-                // Initialize audio on first touch if needed
-                if (!soundEnabled) initAudio();
-                // Handle movement immediately on touch start
+                if (!soundEnabled || !speechAvailable) initAudioAndSpeech(); // Ensure init on first interaction
                 handlePointerMove(e);
             }
 
             function handlePointerMove(e) {
-                 // Prevent default touch actions like scrolling/zooming
                 e.preventDefault();
-                // Initialize audio on first move if needed (redundant if start handled it, but safe)
-                if (!soundEnabled) initAudio();
+                // No need to call init here again if start handles it
 
                 const rect = canvas.getBoundingClientRect();
                 let clientX;
-
-                // Check if it's a touch event
-                if (e.touches && e.touches.length > 0) {
-                    clientX = e.touches[0].clientX;
-                } else if (e.clientX) { // Check if it's a mouse event
-                    clientX = e.clientX;
-                } else {
-                    return; // Exit if no valid pointer data
-                }
+                if (e.touches && e.touches.length > 0) clientX = e.touches[0].clientX;
+                else if (e.clientX) clientX = e.clientX;
+                else return;
 
                 let relativeX = clientX - rect.left;
-                // Scale relativeX based on canvas display size vs internal resolution
                 relativeX *= canvas.width / rect.width;
 
-                // Update paddle position, clamping within canvas bounds using current paddleWidth
                 const halfPaddle = paddleWidth / 2;
-                if (relativeX > halfPaddle && relativeX < canvas.width - halfPaddle) {
-                    paddleX = relativeX - halfPaddle;
-                } else if (relativeX <= halfPaddle) {
-                    paddleX = 0; // Clamp to left edge
-                } else {
-                    paddleX = canvas.width - paddleWidth; // Clamp to right edge
-                }
+                if (relativeX > halfPaddle && relativeX < canvas.width - halfPaddle) paddleX = relativeX - halfPaddle;
+                else if (relativeX <= halfPaddle) paddleX = 0;
+                else paddleX = canvas.width - paddleWidth;
             }
-
 
             // --- Keyboard Control Handlers ---
             function keyDownHandler(e) {
@@ -330,23 +344,16 @@
                 ctx.beginPath();
                 ctx.arc(x, y, ballRadius, 0, Math.PI * 2);
                 const gradient = ctx.createRadialGradient(x, y, ballRadius * 0.1, x, y, ballRadius);
-                gradient.addColorStop(0, "#ffffff");
-                gradient.addColorStop(0.7, "#00ffcc");
-                gradient.addColorStop(1, "#00bfa5");
-                ctx.fillStyle = gradient;
-                ctx.fill();
-                ctx.closePath();
+                gradient.addColorStop(0, "#ffffff"); gradient.addColorStop(0.7, "#00ffcc"); gradient.addColorStop(1, "#00bfa5");
+                ctx.fillStyle = gradient; ctx.fill(); ctx.closePath();
             }
 
             function drawPaddle() {
                 ctx.beginPath();
                 ctx.rect(paddleX, canvas.height - paddleHeight, paddleWidth, paddleHeight);
                 const gradient = ctx.createLinearGradient(paddleX, canvas.height - paddleHeight, paddleX, canvas.height);
-                gradient.addColorStop(0, "#fca311");
-                gradient.addColorStop(1, "#e85d04");
-                ctx.fillStyle = gradient;
-                ctx.fill();
-                ctx.closePath();
+                gradient.addColorStop(0, "#fca311"); gradient.addColorStop(1, "#e85d04");
+                ctx.fillStyle = gradient; ctx.fill(); ctx.closePath();
             }
 
             function drawBricks() {
@@ -355,22 +362,17 @@
                         const brick = bricks[c][r];
                         if (brick.status == 1) {
                             ctx.beginPath();
-                            ctx.rect(brick.x, brick.y, brickWidth, brickHeight); // Use calculated width/height
-
+                            ctx.rect(brick.x, brick.y, brickWidth, brickHeight);
                             let fillColor;
                             if (brick.hitsRequired === 1) fillColor = brickColor1Hit;
                             else fillColor = (brick.currentHits === 0) ? brickColor2HitInitial : brickColor2HitDamaged;
-                            ctx.fillStyle = fillColor;
-                            ctx.fill();
-                            ctx.closePath();
+                            ctx.fillStyle = fillColor; ctx.fill(); ctx.closePath();
 
-                            // Draw word (adjust font size if bricks are very small)
-                            const fontSize = Math.min(10, brickHeight * 0.5); // Dynamic font size based on brick height
+                            const fontSize = Math.min(10, brickHeight * 0.5);
                             ctx.font = `${fontSize}px 'Press Start 2P'`;
-                            ctx.fillStyle = "#ffffff";
-                            ctx.textAlign = "center";
+                            ctx.fillStyle = "#ffffff"; ctx.textAlign = "center";
                             const textX = brick.x + brickWidth / 2;
-                            const textY = brick.y + brickHeight / 2 + (fontSize / 2.5); // Adjust vertical centering
+                            const textY = brick.y + brickHeight / 2 + (fontSize / 2.5);
                             ctx.fillText(brick.word, textX, textY);
                         }
                     }
@@ -387,7 +389,6 @@
                     for (let r = 0; r < brickRowCount; r++) {
                         const b = bricks[c][r];
                         if (b.status == 1) {
-                            // AABB Collision check
                             if (x + ballRadius > b.x && x - ballRadius < b.x + brickWidth &&
                                 y + ballRadius > b.y && y - ballRadius < b.y + brickHeight)
                             {
@@ -395,34 +396,35 @@
                                 b.currentHits++;
 
                                 if (b.currentHits >= b.hitsRequired) {
+                                    // --- Brick Broken ---
                                     b.status = 0;
                                     score++;
                                     playSound('C5', '16n', -5);
+                                    speakWord(b.word); // <<< Speak the word when brick breaks
 
                                     // Increase speed
                                     if (Math.abs(dx) < maxBallSpeed && Math.abs(dy) < maxBallSpeed) {
                                         dx += (dx > 0 ? speedIncrement : -speedIncrement);
                                         dy += (dy > 0 ? speedIncrement : -speedIncrement);
                                     }
-
                                     // Decrease paddle width
                                     if (paddleWidth > minPaddleWidth) {
                                         paddleWidth -= paddleShrinkAmount;
-                                        // Ensure paddle doesn't go off-screen after resize
                                         if (paddleX + paddleWidth > canvas.width) {
                                             paddleX = canvas.width - paddleWidth;
                                         }
                                     }
-
                                     updateScore();
-
                                     // Check win condition
                                     if (score == totalBricks) {
                                         playSound('G5', '8n', 0);
                                         showEndGameMessage("YOU WIN, CONGRATS!");
                                     }
                                 } else {
+                                    // --- Brick Damaged ---
                                     playSound('A4', '32n', -15); // Damaged sound
+                                    // Optional: Speak word on first hit too?
+                                    // if(b.currentHits === 1) { speakWord(b.word); }
                                 }
                             }
                         }
@@ -432,41 +434,26 @@
 
             // --- Game Logic ---
             function movePaddle() {
-                 // Handle keyboard movement
-                 if (rightPressed && paddleX < canvas.width - paddleWidth) {
-                    paddleX += 7;
-                } else if (leftPressed && paddleX > 0) {
-                    paddleX -= 7;
-                }
-                 // Pointer movement is handled by handlePointerMove directly updating paddleX
+                 if (rightPressed && paddleX < canvas.width - paddleWidth) paddleX += 7;
+                 else if (leftPressed && paddleX > 0) paddleX -= 7;
             }
 
             function moveBall() {
-                // Wall collisions
-                if (x + dx > canvas.width - ballRadius || x + dx < ballRadius) {
-                    dx = -dx;
-                    playSound('C4', '32n', -10);
-                }
-                if (y + dy < ballRadius) {
-                    dy = -dy;
-                    playSound('C4', '32n', -10);
-                }
-                // Paddle/Bottom collision
+                if (x + dx > canvas.width - ballRadius || x + dx < ballRadius) { dx = -dx; playSound('C4', '32n', -10); }
+                if (y + dy < ballRadius) { dy = -dy; playSound('C4', '32n', -10); }
                 else if (y + dy > canvas.height - ballRadius - paddleHeight) {
                      if (x > paddleX && x < paddleX + paddleWidth && y + dy > canvas.height - ballRadius - paddleHeight) {
-                         dy = -dy;
-                         playSound('E4', '16n', -8);
+                         dy = -dy; playSound('E4', '16n', -8);
                          let deltaX = x - (paddleX + paddleWidth/2);
                          dx = deltaX * 0.2;
                          dx = Math.max(-maxBallSpeed * 0.8, Math.min(maxBallSpeed * 0.8, dx));
                     } else if (y + dy > canvas.height - ballRadius) {
                          playSound('C3', '4n', 0);
+                         window.speechSynthesis.cancel(); // Stop any speech on game over
                          showEndGameMessage("GAME OVER");
                     }
                 }
-
-                x += dx;
-                y += dy;
+                x += dx; y += dy;
             }
 
             function showEndGameMessage(message) {
@@ -478,36 +465,15 @@
             // --- Main Game Loop ---
             function draw() {
                 if (!gameRunning) return;
-
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
-                drawBricks();
-                drawBall();
-                drawPaddle();
-                collisionDetection();
-                moveBall();
-                movePaddle(); // Handles keyboard input
-
+                drawBricks(); drawBall(); drawPaddle();
+                collisionDetection(); moveBall(); movePaddle();
                 requestAnimationFrame(draw);
             }
 
             // --- Initial Setup ---
-            initGame(); // Initialize with calculated layout
-            draw(); // Start the game loop
-
-            // --- Optional: Resize handler to recalculate layout if window size changes ---
-            // let resizeTimeout;
-            // window.addEventListener('resize', () => {
-            //     // Debounce resize event
-            //     clearTimeout(resizeTimeout);
-            //     resizeTimeout = setTimeout(() => {
-            //         console.log("Resizing...");
-            //         // Recalculate layout and potentially restart or adjust game state
-            //         // For simplicity, we might just restart the game on resize
-            //         initGame();
-            //         // Note: A more complex solution would try to preserve game state
-            //     }, 250); // Wait 250ms after resize stops
-            // });
-
+            initGame();
+            draw();
         };
     </script>
 </body>
